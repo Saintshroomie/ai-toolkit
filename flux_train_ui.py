@@ -14,7 +14,7 @@ import os
 import shutil
 import json
 import yaml
-import threading
+import subprocess
 from slugify import slugify
 from transformers import AutoProcessor, AutoModelForCausalLM
 
@@ -142,11 +142,27 @@ def recursive_update(d, u):
     return d
 
 def restart_application():
-    def _restart():
-        python = sys.executable
-        os.execv(python, [python] + sys.argv)
-
-    threading.Timer(0.5, _restart).start()
+    restart_script = (
+        "import os,signal,subprocess,sys,time\n"
+        "pgid=int(sys.argv[1])\n"
+        "args=sys.argv[2:]\n"
+        "time.sleep(0.5)\n"
+        "try:\n"
+        "    os.killpg(pgid, signal.SIGTERM)\n"
+        "except ProcessLookupError:\n"
+        "    pass\n"
+        "time.sleep(1)\n"
+        "try:\n"
+        "    os.killpg(pgid, signal.SIGKILL)\n"
+        "except ProcessLookupError:\n"
+        "    pass\n"
+        "subprocess.Popen([sys.executable] + args, start_new_session=True)\n"
+    )
+    pgid = os.getpgid(0)
+    subprocess.Popen(
+        [sys.executable, "-c", restart_script, str(pgid)] + sys.argv,
+        start_new_session=True,
+    )
     return "Restarting the application now. Please refresh the page in a few seconds."
 
 def start_training(
