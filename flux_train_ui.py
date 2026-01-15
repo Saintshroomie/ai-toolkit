@@ -14,6 +14,7 @@ import os
 import shutil
 import json
 import yaml
+import threading
 from slugify import slugify
 from transformers import AutoProcessor, AutoModelForCausalLM
 
@@ -139,6 +140,14 @@ def recursive_update(d, u):
         else:
             d[k] = v
     return d
+
+def restart_application():
+    def _restart():
+        python = sys.executable
+        os.execv(python, [python] + sys.argv)
+
+    threading.Timer(0.5, _restart).start()
+    return "Restarting the application now. Please refresh the page in a few seconds."
 
 def start_training(
     lora_name,
@@ -289,6 +298,9 @@ with gr.Blocks(theme=theme, css=css) as demo:
 ### Train a high quality FLUX LoRA in a breeze ༄ using [Ostris' AI Toolkit](https://github.com/ostris/ai-toolkit)"""
     )
     with gr.Column() as main_ui:
+        with gr.Accordion("Maintenance", open=False):
+            restart_status = gr.Markdown("")
+            restart_button = gr.Button("Restart application")
         with gr.Row():
             lora_name = gr.Textbox(
                 label="The name of your LoRA",
@@ -409,6 +421,7 @@ with gr.Blocks(theme=theme, css=css) as demo:
     )
 
     do_captioning.click(fn=run_captioning, inputs=[images, concept_sentence] + caption_list, outputs=caption_list)
+    restart_button.click(fn=restart_application, outputs=restart_status)
 
 if __name__ == "__main__":
     demo.launch(share=True, show_error=True)
