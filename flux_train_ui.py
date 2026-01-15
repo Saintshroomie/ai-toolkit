@@ -14,6 +14,7 @@ import os
 import shutil
 import json
 import yaml
+import subprocess
 from slugify import slugify
 from transformers import AutoProcessor, AutoModelForCausalLM
 
@@ -139,6 +140,30 @@ def recursive_update(d, u):
         else:
             d[k] = v
     return d
+
+def restart_application():
+    restart_script = (
+        "import os,signal,subprocess,sys,time\n"
+        "pgid=int(sys.argv[1])\n"
+        "args=sys.argv[2:]\n"
+        "time.sleep(0.5)\n"
+        "try:\n"
+        "    os.killpg(pgid, signal.SIGTERM)\n"
+        "except ProcessLookupError:\n"
+        "    pass\n"
+        "time.sleep(1)\n"
+        "try:\n"
+        "    os.killpg(pgid, signal.SIGKILL)\n"
+        "except ProcessLookupError:\n"
+        "    pass\n"
+        "subprocess.Popen([sys.executable] + args, start_new_session=True)\n"
+    )
+    pgid = os.getpgid(0)
+    subprocess.Popen(
+        [sys.executable, "-c", restart_script, str(pgid)] + sys.argv,
+        start_new_session=True,
+    )
+    return "Restarting the application now. Please refresh the page in a few seconds."
 
 def start_training(
     lora_name,
@@ -289,6 +314,9 @@ with gr.Blocks(theme=theme, css=css) as demo:
 ### Train a high quality FLUX LoRA in a breeze ༄ using [Ostris' AI Toolkit](https://github.com/ostris/ai-toolkit)"""
     )
     with gr.Column() as main_ui:
+        with gr.Accordion("Maintenance", open=False):
+            restart_status = gr.Markdown("")
+            restart_button = gr.Button("Restart application")
         with gr.Row():
             lora_name = gr.Textbox(
                 label="The name of your LoRA",
@@ -409,6 +437,7 @@ with gr.Blocks(theme=theme, css=css) as demo:
     )
 
     do_captioning.click(fn=run_captioning, inputs=[images, concept_sentence] + caption_list, outputs=caption_list)
+    restart_button.click(fn=restart_application, outputs=restart_status)
 
 if __name__ == "__main__":
     demo.launch(share=True, show_error=True)
